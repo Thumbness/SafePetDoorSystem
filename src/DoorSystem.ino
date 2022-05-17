@@ -8,20 +8,70 @@
 #include "MFRC522.h"
 
 #define SWITCH_PIN D4
+#define BLUE_LED D5
 #define GREEN_LED D7
 #define YELLOW_LED D8
-
 #define SS_PIN A5
 #define RST_PIN A2
 
 int switchState;
-bool inside;
 int cntr;
 
 unsigned long uid;
 unsigned long feederCard;
+bool initSetup;
 
 MFRC522 mfrc522(SS_PIN, RST_PIN);
+
+void getCardID(const char *event, const char *data);
+void updateStatusLED(const char *event, const char *data);
+void GetPetStatus();
+void PetInside();
+void PetOutside();
+void CheckforManualRecalibrate();
+void CheckCounter();
+void ReadCard();
+unsigned long GetID();
+
+// setup() runs once, when the device is first turned on.
+void setup()
+{
+  pinMode(SWITCH_PIN, INPUT);
+  pinMode(GREEN_LED, OUTPUT);
+  pinMode(YELLOW_LED, OUTPUT);
+  pinMode(BLUE_LED, OUTPUT);
+  feederCard = 0;
+  cntr = 1;
+  initSetup = false;
+  mfrc522.setSPIConfig();
+  mfrc522.PCD_Init();
+  Particle.subscribe("Card_ID", getCardID);
+  Particle.subscribe("Pet_Fed", updateStatusLED);
+}
+
+// loop() runs over and over again, as quickly as it can execute.
+void loop()
+{
+  if (!initSetup)
+  {
+    InitFlashLED();
+  }
+  CheckforManualRecalibrate();
+  ReadCard();
+  CheckCounter();
+}
+
+void InitFlashLED()
+{
+  do
+  {
+    digitalWrite(BLUE_LED, HIGH);
+    delay(500);
+    digitalWrite(BLUE_LED, LOW);
+    delay(500);
+  } while (feederCard == 0);
+  initSetup = true;
+}
 
 void getCardID(const char *event, const char *data)
 {
@@ -31,25 +81,44 @@ void getCardID(const char *event, const char *data)
   Serial.println(feederCard);
 }
 
-void CheckPetStatus()
+void GetPetStatus()
 {
   if (cntr % 2 == 1)
   {
-    digitalWrite(GREEN_LED, HIGH);
-    digitalWrite(YELLOW_LED, LOW);
-    if (uid == feederCard)
-    {
-      Particle.publish("Pet_status", "inside");
-    }
+    PetInside();
   }
   if (cntr % 2 == 0)
   {
-    digitalWrite(GREEN_LED, LOW);
-    digitalWrite(YELLOW_LED, HIGH);
-    if (uid == feederCard)
-    {
-      Particle.publish("Pet_status", "outside");
-    }
+    PetOutside();
+  }
+}
+void updateStatusLED(const char *event, const char *data)
+{
+  std::string temp = (std::string)data;
+  if (temp == "true")
+  {
+    cntr = 1;
+    GetPetStatus();
+  }
+}
+
+void PetInside()
+{
+  digitalWrite(GREEN_LED, HIGH);
+  digitalWrite(YELLOW_LED, LOW);
+  if (uid == feederCard)
+  {
+    Particle.publish("Pet_status", "inside");
+  }
+}
+
+void PetOutside()
+{
+  digitalWrite(GREEN_LED, LOW);
+  digitalWrite(YELLOW_LED, HIGH);
+  if (uid == feederCard)
+  {
+    Particle.publish("Pet_status", "outside");
   }
 }
 
@@ -59,7 +128,7 @@ void CheckforManualRecalibrate()
   if (switchState == HIGH)
   {
     cntr += 1;
-    CheckPetStatus();
+    GetPetStatus();
     delay(2000);
   }
 }
@@ -73,40 +142,23 @@ void CheckCounter()
 }
 
 // setup() runs once, when the device is first turned on.
-void setup()
-{
-  pinMode(SWITCH_PIN, INPUT);
-  pinMode(GREEN_LED, OUTPUT);
-  pinMode(YELLOW_LED, OUTPUT);
-  cntr = 1;
-
-  mfrc522.setSPIConfig();
-  mfrc522.PCD_Init();
-
-  Particle.subscribe("Card_ID", getCardID);
-}
-
-// loop() runs over and over again, as quickly as it can execute.
-void loop()
-{
-
-  CheckforManualRecalibrate();
-  ReadCard();
-  CheckCounter();
-}
 
 void ReadCard()
 {
   if (mfrc522.PICC_IsNewCardPresent())
   {
     cntr += 1;
-    uid = getID();
+    uid = GetID();
     Serial.print("Card detected, UID: ");
     Serial.println(uid);
+    if (uid == feederCard)
+    {
+      GetPetStatus();
+    }
   }
 }
 // get RFID tag ID
-unsigned long getID()
+unsigned long GetID()
 {
   if (!mfrc522.PICC_ReadCardSerial())
   { // Since a PICC placed get Serial and continue
@@ -118,6 +170,6 @@ unsigned long getID()
   hex_num += mfrc522.uid.uidByte[2] << 8;
   hex_num += mfrc522.uid.uidByte[3];
   mfrc522.PICC_HaltA(); // Stop reading
-  CheckPetStatus();
+
   return hex_num;
 }
