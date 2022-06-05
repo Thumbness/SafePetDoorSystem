@@ -1,3 +1,9 @@
+/******************************************************/
+//       THIS IS A GENERATED FILE - DO NOT EDIT       //
+/******************************************************/
+
+#include "Particle.h"
+#line 1 "c:/Users/facef/OneDrive/Desktop/Embedded_Project/SafePetDoorSystem/src/DoorSystem.ino"
 /*
  * Project DoorSystem
  * Description:
@@ -7,6 +13,10 @@
 
 #include "MFRC522.h"
 
+void setup();
+void loop();
+void InitFlashLED();
+#line 10 "c:/Users/facef/OneDrive/Desktop/Embedded_Project/SafePetDoorSystem/src/DoorSystem.ino"
 #define SWITCH_PIN D4
 #define BLUE_LED D5
 #define GREEN_LED D7
@@ -95,7 +105,7 @@ void GetPetStatus()
 void updateStatusLED(const char *event, const char *data)
 {
   std::string temp = (std::string)data;
-  if (temp == "true" || temp == "false")
+  if (temp == "true")
   {
     cntr = 1;
     GetPetStatus();
